@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 pub use nix::net::if_::InterfaceFlags;
 pub use nix::sys::socket::SockaddrStorage;
 
