@@ -10,3 +10,4 @@ categories = ["os::unix-apis", "network-programming", "api-bindings", "no-std"]
 description = "Implementation of `getifaddrs` using syscalls in rustix"
 
 [dependencies]
+nix = { version = "0.31.2", features = ["net"]}
