@@ -39,18 +39,44 @@ pub struct InterfaceAddressIterator {
     nix_iter: nix::ifaddrs::InterfaceAddressIterator,
 }
 
+fn read_sysfs_stat(interface_name: &str, stat_name: &str) -> Option<u64> {
+    let path = format!("/sys/class/net/{interface_name}/statistics/{stat_name}");
+    std::fs::read_to_string(path)
+        .ok()?
+        .trim()
+        .parse::<u64>()
+        .ok()
+}
+
+fn read_link_stats_64(interface_name: &str) -> Option<LinkStats64> {
+    Some(LinkStats64 {
+        tx_packets: read_sysfs_stat(interface_name, "tx_packets")?,
+        rx_packets: read_sysfs_stat(interface_name, "rx_packets")?,
+        tx_bytes: read_sysfs_stat(interface_name, "tx_bytes")?,
+        rx_bytes: read_sysfs_stat(interface_name, "rx_bytes")?,
+        tx_errors: read_sysfs_stat(interface_name, "tx_errors")?,
+        rx_errors: read_sysfs_stat(interface_name, "rx_errors")?,
+        tx_dropped: read_sysfs_stat(interface_name, "tx_dropped")?,
+        rx_dropped: read_sysfs_stat(interface_name, "rx_dropped")?,
+    })
+}
+
 impl core::iter::Iterator for InterfaceAddressIterator {
     type Item = InterfaceAddress;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.nix_iter.next().map(|addr| InterfaceAddress {
-            interface_name: addr.interface_name,
-            flags: addr.flags,
-            address: addr.address,
-            netmask: addr.netmask,
-            broadcast: addr.broadcast,
-            destination: addr.destination,
-            link_stats_64: None, //TODO: Populate it using `ifa_data`, when address family is AF_PACKET
+        self.nix_iter.next().map(|addr| {
+            let interface_name = addr.interface_name;
+            let link_stats_64 = read_link_stats_64(&interface_name);
+            InterfaceAddress {
+                interface_name,
+                flags: addr.flags,
+                address: addr.address,
+                netmask: addr.netmask,
+                broadcast: addr.broadcast,
+                destination: addr.destination,
+                link_stats_64,
+            }
         })
     }
 }
