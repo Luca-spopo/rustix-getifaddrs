@@ -31,6 +31,8 @@ pub struct InterfaceAddress {
     pub destination: Option<SockaddrStorage>,
     /// RTNL Link Stats
     pub link_stats_64: Option<LinkStats64>,
+    //MTU of the device
+    pub mtu: Option<u32>,
 }
 
 #[derive(Debug, Hash, PartialEq, Eq /* TODO: StructuralPartialEq? */)]
@@ -39,13 +41,17 @@ pub struct InterfaceAddressIterator {
     nix_iter: nix::ifaddrs::InterfaceAddressIterator,
 }
 
-fn read_sysfs_stat(interface_name: &str, stat_name: &str) -> Option<u64> {
-    let path = format!("/sys/class/net/{interface_name}/statistics/{stat_name}");
+fn read_sysclassnet<T: core::str::FromStr>(path: &str) -> Option<T> {
     std::fs::read_to_string(path)
         .ok()?
         .trim()
-        .parse::<u64>()
+        .parse::<T>()
         .ok()
+}
+
+fn read_sysfs_stat(interface_name: &str, stat_name: &str) -> Option<u64> {
+    let path = format!("/sys/class/net/{interface_name}/statistics/{stat_name}");
+    read_sysclassnet(&path)
 }
 
 fn read_link_stats_64(interface_name: &str) -> Option<LinkStats64> {
@@ -68,6 +74,7 @@ impl core::iter::Iterator for InterfaceAddressIterator {
         self.nix_iter.next().map(|addr| {
             let interface_name = addr.interface_name;
             let link_stats_64 = read_link_stats_64(&interface_name);
+            let mtu = read_sysclassnet(&format!("/sys/class/net/{interface_name}/mtu"));
             InterfaceAddress {
                 interface_name,
                 flags: addr.flags,
@@ -76,6 +83,7 @@ impl core::iter::Iterator for InterfaceAddressIterator {
                 broadcast: addr.broadcast,
                 destination: addr.destination,
                 link_stats_64,
+                mtu,
             }
         })
     }
